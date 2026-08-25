@@ -96,10 +96,6 @@ For each word of length *n* at intensity *i* (0.2–0.7), the first `max(1, roun
 
 A `MutationObserver` (debounced at 80 ms) watches the active root so dynamic content gets the same treatment without thrashing.
 
-## Things you can add later
-
-The reference project (pleasant-reader) also bundles KaTeX for LaTeX math rendering. The reader's `.article-body` is the right hook for it — a `bodyHasMath()` check followed by `import(chrome.runtime.getURL('vendor/katex/auto-render.mjs'))`. Skipped here because the math payload is ~1 MB.
-
 ## Privacy
 
 No network requests, no analytics, no remote code. The only data the extension stores is your settings, kept in `chrome.storage.sync` so they follow your Google account.

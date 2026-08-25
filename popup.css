@@ -377,7 +377,7 @@ kbd {
 }
 
 .popup.unavailable::after {
-  content: 'This page can\u2019t be transformed.';
+  content: 'This page can’t be transformed.';
   display: block;
   text-align: center;
   font-size: 11px;
