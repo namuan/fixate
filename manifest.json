@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Fixate",
+  "short_name": "Fixate",
+  "version": "2.0.0",
+  "description": "Bold the first part of every word — with an optional warm, distraction-free reader view for long articles. Fixate, Restyle, and Reader modes.",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_title": "Fixate"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["fixate.js", "readability.js", "content.js"],
+      "css": ["fixate.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fonts/*.woff2",
+        "restyle.css",
+        "reader.css"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "commands": {
+    "toggle-fixate": {
+      "suggested_key": {
+        "default": "Alt+B"
+      },
+      "description": "Toggle Fixate on the current page"
+    }
+  },
+  "minimum_chrome_version": "102"
+}

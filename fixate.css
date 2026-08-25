@@ -1,0 +1,8 @@
+.fixate-wrapper {
+  display: contents;
+}
+
+.fixate-wrapper b {
+  font-weight: 700;
+  color: inherit;
+}

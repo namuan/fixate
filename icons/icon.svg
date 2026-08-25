@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a86b50"/>
+      <stop offset="100%" stop-color="#7a4732"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <ellipse cx="64" cy="64" rx="40" ry="25" fill="#F1E9DF"/>
+  <circle cx="64" cy="64" r="11.5" fill="#483A31"/>
+  <circle cx="60" cy="59" r="3" fill="#F1E9DF"/>
+</svg>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fixate</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="popup">
+    <header class="head">
+      <div class="brand">
+        <span class="dot" aria-hidden="true"></span>
+        <div class="brand-text">
+          <h1>Fixate</h1>
+          <p class="subtitle">Bold words · pleasant reads</p>
+        </div>
+      </div>
+      <span class="version" id="version">v2.0.0</span>
+    </header>
+
+    <section class="section">
+      <h2 class="label">Mode</h2>
+      <div class="seg quad" id="mode-seg" role="group" aria-label="Reading mode">
+        <button data-mode="off"     class="seg-btn" title="No transformation">Off</button>
+        <button data-mode="fixate"  class="seg-btn" title="Bold first part of words, in place">Fixate</button>
+        <button data-mode="restyle" class="seg-btn" title="Repaint page warmly in place">Restyle</button>
+        <button data-mode="reader"  class="seg-btn" title="Extract & rebuild in clean column">Reader</button>
+      </div>
+      <p class="hint" id="mode-hint">Pick a mode to start.</p>
+    </section>
+
+    <section class="section">
+      <div class="row">
+        <div class="row-label">
+          <span class="row-title">Fixate</span>
+          <span class="row-desc" id="fixate-status">On</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="fixate-enabled" aria-label="Enable the bolded-prefix effect">
+          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="slider-row">
+        <input type="range" id="intensity" class="slider" min="20" max="70" step="1" value="40" aria-label="Fixate intensity">
+        <div class="scale">
+          <span>Subtle</span>
+          <span class="value" id="intensity-value">40%</span>
+          <span>Strong</span>
+        </div>
+      </div>
+
+      <div class="preview" id="preview" aria-live="polite">Fixate guides your eyes through every page.</div>
+    </section>
+
+    <section class="section" id="reading-section">
+      <h2 class="label">Reading</h2>
+      <div class="seg" id="theme-seg" role="group" aria-label="Theme">
+        <button data-theme="auto"  class="seg-btn">Auto</button>
+        <button data-theme="light" class="seg-btn">Light</button>
+        <button data-theme="dark"  class="seg-btn">Dark</button>
+      </div>
+
+      <div class="font-row">
+        <button class="step" id="font-dec" aria-label="Smaller text">A−</button>
+        <input type="range" id="font-scale" class="slider" min="0.8" max="1.6" step="0.05" value="1" aria-label="Text size">
+        <button class="step" id="font-inc" aria-label="Larger text">A+</button>
+        <span class="fontval" id="font-value">100%</span>
+      </div>
+
+      <label class="switch-row">
+        <span class="switch">
+          <input type="checkbox" id="keep-figures-light">
+          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        </span>
+        <span class="switch-label">Keep figures light in dark mode</span>
+      </label>
+    </section>
+
+    <section class="section" id="site-section">
+      <h2 class="label">On <span class="site-host" id="site-host">this site</span></h2>
+      <label class="switch-row">
+        <span class="switch">
+          <input type="checkbox" id="never-this-site" aria-label="Never on this site">
+          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        </span>
+        <span class="switch-label">Never on this site</span>
+      </label>
+      <p class="hint" id="site-hint">When the extension is ON, it applies on every site. Turn this on to exclude this one.</p>
+    </section>
+
+    <footer class="foot">
+      <span class="hint-inline">Press <kbd>Alt</kbd>+<kbd>B</kbd> to toggle</span>
+    </footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

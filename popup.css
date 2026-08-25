@@ -1,0 +1,386 @@
+@font-face {
+  font-family: 'National Park';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('fonts/nationalpark-latin.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light dark;
+  --cream: #F1E9DF;
+  --card: #FBF7F0;
+  --card-border: rgba(137, 85, 62, 0.18);
+  --dark-brown: #483A31;
+  --rust: #89553E;
+  --rust-hover: #6f4330;
+  --body: #7B6F65;
+  --code-bg: #2D2A2E;
+  --code-text: #FCFCFA;
+  --kbd-bg: rgba(137, 85, 62, 0.10);
+  --kbd-border: rgba(137, 85, 62, 0.20);
+  --track: rgba(137, 85, 62, 0.18);
+  --track-off: rgba(137, 85, 62, 0.18);
+  --shadow: 0 1px 2px rgba(72, 58, 49, 0.06);
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cream: #1a1714;
+    --card: #221d19;
+    --card-border: rgba(200, 180, 160, 0.14);
+    --dark-brown: #e8ddd0;
+    --rust: #c4836a;
+    --rust-hover: #d49a83;
+    --body: #a89e94;
+    --code-bg: #2a2628;
+    --code-text: #FCFCFA;
+    --kbd-bg: rgba(200, 180, 160, 0.10);
+    --kbd-border: rgba(200, 180, 160, 0.18);
+    --track: rgba(200, 180, 160, 0.18);
+    --track-off: rgba(200, 180, 160, 0.18);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'National Park', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  background: var(--cream);
+  color: var(--body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.popup {
+  width: 360px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ----- header ----- */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand .dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--rust);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(137, 85, 62, 0.10);
+}
+
+.brand-text h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dark-brown);
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--body);
+  margin: 1px 0 0;
+  line-height: 1.2;
+  opacity: 0.85;
+}
+
+.version {
+  font-size: 10px;
+  color: var(--body);
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- section ----- */
+.section {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow);
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--dark-brown);
+  margin: 0;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--body);
+  margin: -2px 0 0;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
+/* ----- segmented control ----- */
+.seg {
+  display: flex;
+  gap: 4px;
+  background: var(--cream);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.seg.quad .seg-btn { font-size: 11px; padding: 6px 4px; }
+
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  color: var(--body);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg-btn:hover { color: var(--rust); }
+
+.seg-btn.active {
+  background: var(--rust);
+  color: var(--cream);
+  border-color: var(--rust);
+}
+
+/* ----- row + switch ----- */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.row-title { font-size: 13px; font-weight: 700; color: var(--dark-brown); line-height: 1.2; }
+.row-desc { font-size: 11px; color: var(--body); line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px; height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute; opacity: 0; width: 100%; height: 100%;
+  margin: 0; cursor: pointer; z-index: 1;
+}
+
+.track {
+  position: absolute; inset: 0;
+  background: var(--track-off);
+  border-radius: 999px;
+  transition: background 0.18s;
+}
+
+.thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  background: var(--cream);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+  transition: transform 0.18s;
+}
+
+.switch input:checked + .track { background: var(--rust); }
+.switch input:checked + .track .thumb { transform: translateX(14px); }
+.switch input:focus-visible + .track { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-row .switch { width: 32px; height: 20px; }
+.switch-row .thumb { width: 14px; height: 14px; }
+.switch-row input:checked + .track .thumb { transform: translateX(12px); }
+
+.switch-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dark-brown);
+  line-height: 1.3;
+}
+
+/* ----- slider ----- */
+.slider-row { display: flex; flex-direction: column; gap: 4px; }
+
+.slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--track);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px;
+  background: var(--cream);
+  border: 2px solid var(--rust);
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+  transition: transform 0.1s;
+}
+
+.slider::-webkit-slider-thumb:hover { transform: scale(1.1); }
+.slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.05); }
+.slider::-moz-range-thumb {
+  width: 16px; height: 16px;
+  background: var(--cream);
+  border: 2px solid var(--rust);
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+}
+.slider:focus-visible { outline: 2px solid var(--rust); outline-offset: 4px; }
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+.scale .value { font-weight: 700; color: var(--dark-brown); }
+
+/* ----- preview ----- */
+.preview {
+  background: var(--cream);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dark-brown);
+  min-height: 36px;
+}
+.preview b { font-weight: 700; color: var(--dark-brown); }
+
+/* ----- font row ----- */
+.font-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step {
+  background: var(--cream);
+  color: var(--dark-brown);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.step:hover { border-color: var(--rust); color: var(--rust); }
+
+.fontval {
+  font-size: 11px;
+  color: var(--body);
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ----- per-site ----- */
+.site-host {
+  font-size: 10px;
+  color: var(--rust);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 2px;
+}
+
+/* ----- footer ----- */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+}
+
+.hint-inline {
+  font-size: 11px;
+  color: var(--body);
+  opacity: 0.75;
+}
+
+kbd {
+  display: inline-block;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  color: var(--dark-brown);
+  line-height: 1.3;
+  margin: 0 1px;
+}
+
+/* disabled state when on an un-injectable page */
+.popup.unavailable .section,
+.popup.unavailable .foot {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.popup.unavailable::after {
+  content: 'This page can\u2019t be transformed.';
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: var(--body);
+  padding: 6px 0 0;
+}
