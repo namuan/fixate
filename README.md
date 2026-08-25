@@ -10,6 +10,22 @@ Pick the mode that fits the page:
 
 Fixate (the bolding) is **independent of mode**: toggle it on/off and adjust its intensity inside any of the three modes. The other reading controls (theme, text size, keep figures light) apply to Restyle and Reader.
 
+## Screenshots
+
+The same article in four states — untouched, with Fixate's bolded prefixes, repainted by Restyle, and rebuilt by Reader:
+
+| Plain page | Fixate — bolded prefixes |
+|---|---|
+| ![Plain article](screenshots/fixate-off.png) | ![Fixate mode](screenshots/fixate-on.png) |
+
+| Restyle — warm in-place repaint | Reader — distraction-free column |
+|---|---|
+| ![Restyle mode](screenshots/restyle.png) | ![Reader mode](screenshots/reader.png) |
+
+The popup controls the mode, fixate intensity, theme, and text size:
+
+![Popup controls](screenshots/popup.png)
+
 ## Features
 
 - **Four modes** — Off, Fixate, Restyle, Reader
@@ -69,6 +85,7 @@ fixate/
 ├── restyle.css           in-place warm repaint
 ├── reader.css            reader theme loaded into a Shadow DOM
 ├── popup.html / .css / .js
+├── screenshots/           README captures (popup + three modes)
 ├── fonts/                6 woff2 files (latin + latin-ext for 3 families)
 └── icons/                16/32/48/128 px PNG + SVG source
 ```
