@@ -3,6 +3,14 @@
  *
  * Reads state from the active tab's content script, renders the controls,
  * and sends changes back. Debounces storage writes for slider drags.
+ *
+ * Mode shape:
+ *   - mode: 'off' | 'on'
+ *   - restyleEnabled, readerEnabled: independent layered reading styles
+ *
+ * The popup normalises any pre-2.1 mode values from a stale content script
+ * (running on a tab that wasn't reloaded after the extension updated) so it
+ * keeps showing the right state until the user reloads the page.
  */
 
 (function () {
@@ -17,6 +25,9 @@
     intensity: document.getElementById('intensity'),
     intensityValue: document.getElementById('intensity-value'),
     preview: document.getElementById('preview'),
+    restyleEnabled: document.getElementById('restyle-enabled'),
+    readerEnabled: document.getElementById('reader-enabled'),
+    styleHint: document.getElementById('style-hint'),
     themeSeg: document.getElementById('theme-seg'),
     fontScale: document.getElementById('font-scale'),
     fontValue: document.getElementById('font-value'),
@@ -32,16 +43,49 @@
   el.preview.dataset.text = PREVIEW_TEXT;
 
   const MODE_HINTS = {
-    off:     'Pick a mode to start.',
-    fixate:  'Bold the first part of each word, in place. Lightweight.',
-    restyle: 'Repaint the page warmly in place. Keeps the page\u2019s structure.',
-    reader:  'Extract the article and rebuild it in a clean column.'
+    off: 'Nothing is applied. Switch On to use Fixate and any reading style below.',
+    on:  'Fixate is applied, plus any reading styles you have toggled on below.'
+  };
+
+  const STYLE_HINTS = {
+    none:    'Both off — only the bolded prefixes run.',
+    restyle: 'Restyle is repainting the page in place. Toggle Reader on to extract an article instead.',
+    reader:  'Reader is extracting the article. It covers Restyle while open.'
   };
 
   function siteHintText(state) {
     if (state.neverThisSite) return 'Disabled on this site. Toggle off to re-enable.';
-    if (state.mode === 'off') return 'Extension is OFF. Switch to Fixate, Restyle, or Reader above to apply here.';
+    if (state.mode === 'off') return 'Extension is OFF. Switch to On above to apply here.';
     return 'When the extension is ON, it applies on every site. Toggle on to exclude this one.';
+  }
+
+  function styleHintText(state) {
+    if (state.readerEnabled) return STYLE_HINTS.reader;
+    if (state.restyleEnabled) return STYLE_HINTS.restyle;
+    return STYLE_HINTS.none;
+  }
+
+  function normaliseState(s) {
+    if (!s || typeof s !== 'object') return s;
+    // Legacy mode values from before the on/off + toggles shape (pre-2.1).
+    if (s.mode === 'fixate') {
+      s.mode = 'on';
+      if (typeof s.restyleEnabled !== 'boolean') s.restyleEnabled = false;
+      if (typeof s.readerEnabled !== 'boolean') s.readerEnabled = false;
+    } else if (s.mode === 'restyle') {
+      s.mode = 'on';
+      s.restyleEnabled = true;
+      if (typeof s.readerEnabled !== 'boolean') s.readerEnabled = false;
+    } else if (s.mode === 'reader') {
+      s.mode = 'on';
+      if (typeof s.restyleEnabled !== 'boolean') s.restyleEnabled = false;
+      s.readerEnabled = true;
+    } else if (s.mode !== 'off' && s.mode !== 'on') {
+      s.mode = 'off';
+    }
+    if (typeof s.restyleEnabled !== 'boolean') s.restyleEnabled = false;
+    if (typeof s.readerEnabled !== 'boolean') s.readerEnabled = false;
+    return s;
   }
 
   let tabId = null;
@@ -98,8 +142,10 @@
     }
     el.popup.classList.remove('unavailable');
 
-    setActive(el.modeSeg, 'mode', st.mode || 'off');
-    el.modeHint.textContent = MODE_HINTS[st.mode] || MODE_HINTS.off;
+    const mode = st.mode === 'on' ? 'on' : 'off';
+    el.popup.classList.toggle('mode-off', mode === 'off');
+    setActive(el.modeSeg, 'mode', mode);
+    el.modeHint.textContent = MODE_HINTS[mode] || MODE_HINTS.off;
 
     el.fixateEnabled.checked = !!st.fixateEnabled;
     el.fixateStatus.textContent = st.fixateEnabled ? 'On' : 'Off';
@@ -108,21 +154,25 @@
     el.intensity.disabled = !st.fixateEnabled;
     renderPreview();
 
+    el.restyleEnabled.checked = !!st.restyleEnabled;
+    el.readerEnabled.checked = !!st.readerEnabled;
+    el.styleHint.textContent = styleHintText(st);
+
     setActive(el.themeSeg, 'theme', st.theme);
     const scale = Number(st.fontScale) || 1;
     el.fontScale.value = String(scale);
     el.fontValue.textContent = Math.round(scale * 100) + '%';
     el.keepFiguresLight.checked = !!st.keepFiguresLight;
 
+    const readingActive = !!st.restyleEnabled || !!st.readerEnabled;
+    el.fontScale.disabled = !readingActive;
+    el.fontDec.disabled = !readingActive;
+    el.fontInc.disabled = !readingActive;
+    el.keepFiguresLight.disabled = !readingActive;
+
     el.siteHost.textContent = st.host || 'this site';
     el.neverThisSite.checked = !!st.neverThisSite;
     el.siteHint.textContent = siteHintText(st);
-
-    const isHeavy = st.mode === 'restyle' || st.mode === 'reader';
-    el.fontScale.disabled = !isHeavy;
-    el.fontDec.disabled = !isHeavy;
-    el.fontInc.disabled = !isHeavy;
-    el.keepFiguresLight.disabled = !isHeavy;
   }
 
   /* ----- interactions ----- */
@@ -133,7 +183,7 @@
     const mode = btn.dataset.mode;
     if (st && st.mode === mode) return;
     const resp = await send({ type: 'setMode', mode });
-    if (resp) { st = await send({ type: 'getState' }); render(); }
+    if (resp) { st = normaliseState(await send({ type: 'getState' })); render(); }
   });
 
   el.fixateEnabled.addEventListener('change', () => {
@@ -149,6 +199,18 @@
     renderPreview();
     send({ type: 'setFixateIntensity', value: v });
     scheduleSave({ fixateIntensity: v });
+  });
+
+  el.restyleEnabled.addEventListener('change', () => {
+    send({ type: 'setRestyleEnabled', value: el.restyleEnabled.checked });
+    scheduleSave({ restyleEnabled: el.restyleEnabled.checked });
+    if (st) { st.restyleEnabled = el.restyleEnabled.checked; render(); }
+  });
+
+  el.readerEnabled.addEventListener('change', () => {
+    send({ type: 'setReaderEnabled', value: el.readerEnabled.checked });
+    scheduleSave({ readerEnabled: el.readerEnabled.checked });
+    if (st) { st.readerEnabled = el.readerEnabled.checked; render(); }
   });
 
   el.themeSeg.addEventListener('click', async (e) => {
@@ -195,12 +257,12 @@
       return;
     }
     tabId = tab.id;
-    st = await send({ type: 'getState' });
+    st = normaliseState(await send({ type: 'getState' }));
     if (!st) {
       // Content script may not have loaded yet on a slow page — give it a
       // moment and try once more before declaring this page unavailable.
       await new Promise((r) => setTimeout(r, 250));
-      st = await send({ type: 'getState' });
+      st = normaliseState(await send({ type: 'getState' }));
     }
     render();
   });

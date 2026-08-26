@@ -7,20 +7,35 @@
 
 chrome.runtime.onInstalled.addListener(() => {
   // Seed defaults so first-run queries from the content script always have a
-  // value to read.
+  // value to read. Also migrate legacy mode values from the pre-2.1 shape
+  // (mode was a single value: 'off' | 'fixate' | 'restyle' | 'reader') to the
+  // current on/off + restyleEnabled + readerEnabled shape, so a freshly
+  // installed/updated extension always exposes the canonical keys.
   chrome.storage.sync.get(null, (items) => {
     const seeded = {
-      mode: 'fixate',
+      mode: 'on',
       fixateEnabled: true,
       fixateIntensity: 40,
+      restyleEnabled: false,
+      readerEnabled: false,
       theme: 'auto',
       fontScale: 1,
       keepFiguresLight: false,
       siteOverrides: {}
     };
     const patch = {};
+
+    if (items.mode === 'fixate') { patch.mode = 'on'; }
+    else if (items.mode === 'restyle') { patch.mode = 'on'; patch.restyleEnabled = true; }
+    else if (items.mode === 'reader') { patch.mode = 'on'; patch.readerEnabled = true; }
+    else if (items.mode === undefined || (items.mode !== 'off' && items.mode !== 'on')) {
+      patch.mode = seeded.mode;
+    }
+    if (items.restyleEnabled === undefined) patch.restyleEnabled = seeded.restyleEnabled;
+    if (items.readerEnabled === undefined) patch.readerEnabled = seeded.readerEnabled;
+
     for (const k of Object.keys(seeded)) {
-      if (items[k] === undefined) patch[k] = seeded[k];
+      if (items[k] === undefined && patch[k] === undefined) patch[k] = seeded[k];
     }
     if (Object.keys(patch).length) chrome.storage.sync.set(patch);
   });
@@ -48,7 +63,7 @@ function setBadge(tabId, mode) {
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (sender.id !== chrome.runtime.id) return;
   if (!msg || msg.type !== 'stateChanged' || !sender.tab) return;
-  const mode = ['fixate', 'restyle', 'reader'].includes(msg.mode) ? msg.mode : 'off';
+  const mode = msg.mode === 'on' ? 'on' : 'off';
   setBadge(sender.tab.id, mode);
 });
 

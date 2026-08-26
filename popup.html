@@ -16,21 +16,19 @@
           <p class="subtitle">Bold words · pleasant reads</p>
         </div>
       </div>
-      <span class="version" id="version">v2.0.0</span>
+      <span class="version" id="version">v2.1.0</span>
     </header>
 
     <section class="section">
       <h2 class="label">Mode</h2>
-      <div class="seg quad" id="mode-seg" role="group" aria-label="Reading mode">
-        <button data-mode="off"     class="seg-btn" title="No transformation">Off</button>
-        <button data-mode="fixate"  class="seg-btn" title="Bold first part of words, in place">Fixate</button>
-        <button data-mode="restyle" class="seg-btn" title="Repaint page warmly in place">Restyle</button>
-        <button data-mode="reader"  class="seg-btn" title="Extract & rebuild in clean column">Reader</button>
+      <div class="seg pair" id="mode-seg" role="group" aria-label="Mode">
+        <button data-mode="off" class="seg-btn" title="Disable Fixate on every site">Off</button>
+        <button data-mode="on"  class="seg-btn" title="Apply Fixate and any reading style you toggle on below">On</button>
       </div>
-      <p class="hint" id="mode-hint">Pick a mode to start.</p>
+      <p class="hint" id="mode-hint">Pick a state to start.</p>
     </section>
 
-    <section class="section">
+    <section class="section" id="fixate-section">
       <div class="row">
         <div class="row-label">
           <span class="row-title">Fixate</span>
@@ -52,6 +50,31 @@
       </div>
 
       <div class="preview" id="preview" aria-live="polite">Fixate guides your eyes through every page.</div>
+    </section>
+
+    <section class="section" id="style-section">
+      <h2 class="label">Reading style</h2>
+      <label class="switch-row option">
+        <span class="switch">
+          <input type="checkbox" id="restyle-enabled" aria-label="Restyle">
+          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        </span>
+        <span class="switch-label">
+          <span class="opt-title">Restyle</span>
+          <span class="opt-desc">Repaint the page warmly in place. Keeps the page’s structure.</span>
+        </span>
+      </label>
+      <label class="switch-row option">
+        <span class="switch">
+          <input type="checkbox" id="reader-enabled" aria-label="Reader">
+          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        </span>
+        <span class="switch-label">
+          <span class="opt-title">Reader</span>
+          <span class="opt-desc">Extract the article and rebuild it in a clean column. Best for long-form.</span>
+        </span>
+      </label>
+      <p class="hint" id="style-hint">Both off — only the bolded prefixes run.</p>
     </section>
 
     <section class="section" id="reading-section">

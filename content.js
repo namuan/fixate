@@ -1,16 +1,23 @@
 /*
  * Fixate — content script.
  *
- * Orchestrates four modes on the page:
- *   - 'off'     : no transformation
- *   - 'fixate'  : bold the first part of each word in place (lightweight)
- *   - 'restyle' : repaint the page with the warm earthy palette + nice typography,
- *                 keep the page's own structure, apply fixate
- *   - 'reader'  : extract the article, rebuild it in an isolated Shadow DOM
- *                 overlay using the reader theme, apply fixate inside
+ * One mode (off/on) with three independent layers that compose when on:
+ *   - Fixate   : bold the first part of each word in place (always-on feature)
+ *   - Restyle  : repaint the page with the warm earthy palette + bundled fonts,
+ *                keep the page's own structure
+ *   - Reader   : extract the article and rebuild it in an isolated Shadow DOM
+ *                overlay using the reader theme
  *
- * Fixate is independent of mode — it can be toggled on/off inside any of the
- * three active modes, and its intensity slider is live.
+ * Composition when mode is 'on':
+ *   - Fixate runs on document.body (or on the Reader's .article-body if Reader
+ *     is active), controlled by the fixateEnabled toggle + intensity slider.
+ *   - If readerEnabled is true, Reader is applied. It covers the whole
+ *     viewport, so Restyle is skipped underneath.
+ *   - Else if restyleEnabled is true, Restyle is applied.
+ *   - Else: only Fixate runs.
+ *
+ * Theme, fontScale, and keepFiguresLight only take effect when Restyle or
+ * Reader is on.
  *
  * Reads settings from chrome.storage, listens to storage changes, and
  * responds to messages from the popup / keyboard shortcut.
@@ -26,13 +33,15 @@
   const RESTYLE_LINK_ID = 'fixate-restyle';
 
   const DEFAULTS = {
-    mode: 'fixate',              // 'off' | 'fixate' | 'restyle' | 'reader'
-    fixateEnabled: true,         // independent on/off
+    mode: 'on',                  // 'off' | 'on'
+    fixateEnabled: true,         // independent on/off for the bolded prefix
     fixateIntensity: 40,         // 20-70 (%)
+    restyleEnabled: false,       // in-place repaint with warm palette + fonts
+    readerEnabled: false,        // extract article, rebuild in shadow-DOM column
     theme: 'auto',               // 'auto' | 'light' | 'dark'
     fontScale: 1,                // 0.8 - 1.6
     keepFiguresLight: false,     // in dark mode, leave images un-inverted
-    siteOverrides: {}            // { hostname: 'never' }  (Always is implicit when mode != 'off')
+    siteOverrides: {}            // { hostname: 'never' }
   };
 
   const THEME_BG = { light: '#F1E9DF', dark: '#1a1714' };
@@ -41,6 +50,8 @@
     mode: 'off',
     fixateEnabled: true,
     intensity: 0.4,
+    restyleEnabled: false,
+    readerEnabled: false,
     theme: 'auto',
     fontScale: 1,
     keepFiguresLight: false,
@@ -57,18 +68,38 @@
     return new Promise((resolve) => {
       chrome.storage.sync.get(DEFAULTS, (items) => {
         const s = { ...DEFAULTS, ...items };
-        state.mode = ['off', 'fixate', 'restyle', 'reader'].includes(s.mode) ? s.mode : 'off';
+
+        // Migrate legacy mode values ('fixate' / 'restyle' / 'reader') to the
+        // new on/off + restyleEnabled + readerEnabled shape. The legacy
+        // 'fixate' value is the equivalent of "on, with no reading style".
+        if (s.mode === 'fixate') { s.mode = 'on'; }
+        else if (s.mode === 'restyle') { s.mode = 'on'; s.restyleEnabled = true; }
+        else if (s.mode === 'reader') { s.mode = 'on'; s.readerEnabled = true; }
+        else if (s.mode !== 'off') { s.mode = 'on'; }
+        if (s.restyleEnabled === undefined) s.restyleEnabled = DEFAULTS.restyleEnabled;
+        if (s.readerEnabled === undefined) s.readerEnabled = DEFAULTS.readerEnabled;
+
+        state.mode = s.mode === 'off' ? 'off' : 'on';
         state.fixateEnabled = !!s.fixateEnabled;
         const i = Number(s.fixateIntensity);
         state.intensity = Number.isFinite(i) ? Math.max(20, Math.min(70, i)) / 100 : 0.4;
+        state.restyleEnabled = !!s.restyleEnabled;
+        state.readerEnabled = !!s.readerEnabled;
         state.theme = ['auto', 'light', 'dark'].includes(s.theme) ? s.theme : 'auto';
         const fs = Number(s.fontScale);
         state.fontScale = Number.isFinite(fs) ? Math.min(1.6, Math.max(0.8, fs)) : 1;
         state.keepFiguresLight = !!s.keepFiguresLight;
-        // Per-site opt-out only: 'always' is implicit when the global mode is non-off.
-        // Old 'always' entries from previous installs are normalised to 'default'.
         state._siteOverrides = s.siteOverrides || {};
         state.siteOverride = state._siteOverrides[host()] === 'never' ? 'never' : 'default';
+
+        // Persist the migrated shape so subsequent reads (popup, background)
+        // always see the canonical keys and values.
+        saveSettings({
+          mode: state.mode,
+          restyleEnabled: state.restyleEnabled,
+          readerEnabled: state.readerEnabled
+        });
+
         resolve();
       });
     });
@@ -81,6 +112,15 @@
   function resolvedTheme() {
     if (state.theme === 'light' || state.theme === 'dark') return state.theme;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function isRestyleActive() {
+    return state.mode === 'on' && state.restyleEnabled && !state.readerEnabled &&
+      state.siteOverride !== 'never';
+  }
+
+  function isReaderActive() {
+    return state.mode === 'on' && state.readerEnabled && state.siteOverride !== 'never';
   }
 
   /* ------------------------- document-level fonts --------------------- */
@@ -121,8 +161,8 @@
   /* ------------------------- fixate root selection -------------------- */
 
   function fixateRoot() {
-    if (state.mode === 'reader' && state.reader.body) return state.reader.body;
-    if (state.mode === 'fixate' || state.mode === 'restyle') return document.body;
+    if (state.reader.body) return state.reader.body;
+    if (state.mode === 'on' && state.siteOverride !== 'never') return document.body;
     return null;
   }
 
@@ -149,8 +189,9 @@
   }
 
   function removeFixate() {
-    const root = fixateRoot();
-    if (root && window.Fixate) window.Fixate.unapply(root);
+    if (!window.Fixate) return;
+    if (state.reader.body) window.Fixate.unapply(state.reader.body);
+    window.Fixate.unapply(document.body);
   }
 
   /* ----------------------------- reader mode -------------------------- */
@@ -167,15 +208,9 @@
     ));
   }
 
-  async function enableReader() {
-    if (state.mode === 'restyle') removeRestyle();
-    if (state.mode !== 'reader') {
-      state.mode = 'reader';
-      saveSettings({ mode: 'reader' });
-    }
-
+  function applyReader() {
     const parsed = window.PleasantReadability.parse();
-    if (!parsed.ok) return enableRestyle(true);
+    if (!parsed.ok) return applyRestyle();
 
     state.reader.scrollY = window.scrollY;
     injectFonts();
@@ -223,10 +258,8 @@
 
     bindReaderEvents(shadow);
     watchSystemTheme();
-    state.mode = 'reader';
 
     applyFixate();
-    notifyBackground();
     return true;
   }
 
@@ -348,7 +381,7 @@
 
   function bindReaderEvents(shadow) {
     setThemeButtonIcon(shadow);
-    shadow.querySelector('.close-btn').addEventListener('click', () => disableMode());
+    shadow.querySelector('.close-btn').addEventListener('click', () => setMode('off'));
     shadow.querySelector('.theme-btn').addEventListener('click', () => {
       const next = shadow.host.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       setTheme(next);
@@ -368,10 +401,10 @@
   }
 
   function onReaderKeydown(e) {
-    if (e.key === 'Escape' && state.mode === 'reader') {
+    if (e.key === 'Escape' && isReaderActive()) {
       e.preventDefault();
       e.stopPropagation();
-      disableMode();
+      setMode('off');
     }
   }
 
@@ -381,9 +414,6 @@
     document.documentElement.style.overflow = '';
     document.removeEventListener('keydown', onReaderKeydown, true);
     unwatchSystemTheme();
-    if (state.reader.body && window.Fixate) {
-      window.Fixate.unapply(state.reader.body);
-    }
     state.reader.host = null;
     state.reader.shadow = null;
     state.reader.body = null;
@@ -422,12 +452,7 @@
     state.restyle.barEls = [];
   }
 
-  function enableRestyle(silentFallback) {
-    if (state.mode === 'reader') removeReader();
-    if (state.mode !== 'restyle') {
-      state.mode = 'restyle';
-      saveSettings({ mode: 'restyle' });
-    }
+  function applyRestyle() {
     injectFonts();
 
     if (!document.getElementById(RESTYLE_LINK_ID)) {
@@ -442,10 +467,9 @@
     document.documentElement.style.setProperty('--pr-font-scale', String(state.fontScale));
     pinRestyleBars();
     watchSystemTheme();
-    state.mode = 'restyle';
+
     applyFixate();
-    notifyBackground();
-    return silentFallback ? 'restyle' : true;
+    return true;
   }
 
   function removeRestyle() {
@@ -455,9 +479,31 @@
     document.documentElement.removeAttribute('data-pleasant-restyle');
     document.documentElement.removeAttribute('data-pleasant-figures');
     document.documentElement.style.removeProperty('--pr-font-scale');
-    if (document.body && window.Fixate) {
-      window.Fixate.unapply(document.body);
+  }
+
+  /* ----------------------- enabled-state orchestration ---------------- */
+
+  function applyEnabled() {
+    removeReader();
+    removeRestyle();
+    removeFixate();
+
+    if (state.mode !== 'on' || state.siteOverride === 'never') {
+      notifyBackground();
+      return;
     }
+
+    // Composition: Reader takes precedence over Restyle (it covers the whole
+    // viewport, so the in-place repaint underneath would be hidden anyway).
+    if (state.readerEnabled) {
+      applyReader();
+    } else if (state.restyleEnabled) {
+      applyRestyle();
+    } else {
+      applyFixate();
+    }
+
+    notifyBackground();
   }
 
   /* ----------------------------- theme sync --------------------------- */
@@ -467,13 +513,12 @@
 
   function applyResolvedTheme() {
     const t = resolvedTheme();
-    if (state.mode === 'reader' && state.reader.shadow) {
+    if (state.reader.shadow) {
       state.reader.shadow.host.setAttribute('data-theme', t);
       state.reader.shadow.host.style.setProperty('background-color', THEME_BG[t] || THEME_BG.light, 'important');
       setThemeButtonIcon(state.reader.shadow);
-    } else if (state.mode === 'restyle') {
+    } else if (isRestyleActive()) {
       document.documentElement.setAttribute('data-pleasant-restyle', t);
-      // Re-pin bars so the pinned color matches the new theme.
       unpinRestyleBars();
       pinRestyleBars();
     }
@@ -493,57 +538,31 @@
   }
 
   function notifyBackground() {
-    const effective = state.siteOverride === 'never' ? 'off' : state.mode;
+    const effective = (state.mode === 'on' && state.siteOverride !== 'never') ? 'on' : 'off';
     try { chrome.runtime.sendMessage({ type: 'stateChanged', mode: effective }); } catch (e) {}
   }
 
   /* ------------------------------ control ----------------------------- */
 
-  function applyMode(mode) {
-    if (mode === 'off') return disableMode();
-    if (mode === 'fixate') return enableFixate();
-    if (mode === 'restyle') return enableRestyle();
-    if (mode === 'reader') return enableReader();
-  }
-
-  function enableFixate() {
-    if (state.mode === 'restyle') removeRestyle();
-    if (state.mode === 'reader') removeReader();
-    if (state.mode !== 'fixate') {
-      state.mode = 'fixate';
-      saveSettings({ mode: 'fixate' });
-    }
-    applyFixate();
-    notifyBackground();
-    return true;
-  }
-
-  function disableMode() {
-    removeReader();
-    removeRestyle();
-    removeFixate();
-    if (state.mode !== 'off') {
-      state.mode = 'off';
-      saveSettings({ mode: 'off' });
-      unwatchSystemTheme();
-    }
-    notifyBackground();
+  function setMode(mode) {
+    if (mode !== 'off' && mode !== 'on') return;
+    if (state.mode === mode) return;
+    state.mode = mode;
+    saveSettings({ mode });
+    applyEnabled();
   }
 
   function toggleMode() {
-    if (state.mode !== 'off') {
-      disableMode();
-      return 'off';
-    }
-    // Restore to the most recently active non-off mode, defaulting to fixate.
-    return applyMode('fixate');
+    setMode(state.mode === 'on' ? 'off' : 'on');
   }
 
   function setTheme(theme) {
     state.theme = theme;
     saveSettings({ theme });
     unwatchSystemTheme();
-    if (theme === 'auto' && state.mode !== 'off') watchSystemTheme();
+    if (theme === 'auto' && (isReaderActive() || isRestyleActive())) {
+      watchSystemTheme();
+    }
     applyResolvedTheme();
   }
 
@@ -553,10 +572,10 @@
     const next = Math.min(1.6, Math.max(0.8, v));
     state.fontScale = next;
     saveSettings({ fontScale: next });
-    if (state.mode === 'reader' && state.reader.shadow) {
+    if (state.reader.shadow) {
       state.reader.shadow.host.style.setProperty('--reader-font-scale', String(next));
     }
-    if (state.mode === 'restyle') {
+    if (isRestyleActive()) {
       document.documentElement.style.setProperty('--pr-font-scale', String(next));
     }
   }
@@ -564,10 +583,10 @@
   function setKeepFiguresLight(value) {
     state.keepFiguresLight = !!value;
     saveSettings({ keepFiguresLight: state.keepFiguresLight });
-    if (state.mode === 'reader' && state.reader.shadow) {
+    if (state.reader.shadow) {
       state.reader.shadow.host.setAttribute('data-figures', state.keepFiguresLight ? 'light' : 'invert');
     }
-    if (state.mode === 'restyle') {
+    if (isRestyleActive()) {
       document.documentElement.setAttribute('data-pleasant-figures', state.keepFiguresLight ? 'light' : 'invert');
     }
   }
@@ -586,29 +605,29 @@
     refreshFixate();
   }
 
+  function setRestyleEnabled(value) {
+    state.restyleEnabled = !!value;
+    saveSettings({ restyleEnabled: state.restyleEnabled });
+    applyEnabled();
+  }
+
+  function setReaderEnabled(value) {
+    state.readerEnabled = !!value;
+    saveSettings({ readerEnabled: state.readerEnabled });
+    applyEnabled();
+  }
+
   function setSiteOverride(value) {
     const o = { ...((state && state._siteOverrides) || {}) };
     if (value === 'default') delete o[host()];
     else if (value === 'never') o[host()] = 'never';
-    // 'always' is accepted from the popup for backward compatibility but treated as default.
+    // 'always' is accepted for backward compatibility but treated as default —
+    // the extension runs on every site when mode is non-off, so there's nothing
+    // distinct to opt back into.
     state._siteOverrides = o;
     state.siteOverride = o[host()] === 'never' ? 'never' : 'default';
     saveSettings({ siteOverrides: o });
-    reevaluate();
-  }
-
-  function reevaluate() {
-    // Single source of truth for "should this page be transformed right now?"
-    // Never tears down the current mode WITHOUT mutating state.mode, so the
-    // user's saved mode survives a Never flip.
-    if (state.siteOverride === 'never') {
-      if (state.mode === 'reader') removeReader();
-      else if (state.mode === 'restyle') removeRestyle();
-      else if (state.mode === 'fixate') removeFixate();
-      notifyBackground();
-    } else {
-      if (state.mode !== 'off') applyMode(state.mode);
-    }
+    applyEnabled();
   }
 
   /* ----------------------------- messaging ---------------------------- */
@@ -628,14 +647,16 @@
             siteOverrides: state._siteOverrides || {},
             fixateEnabled: state.fixateEnabled,
             fixateIntensity: Math.round(state.intensity * 100),
+            restyleEnabled: state.restyleEnabled,
+            readerEnabled: state.readerEnabled,
             theme: state.theme,
             fontScale: state.fontScale,
             keepFiguresLight: state.keepFiguresLight
           });
           break;
         case 'setMode':
-          if (!['off', 'fixate', 'restyle', 'reader'].includes(msg.mode)) { sendResponse({ ok: false }); break; }
-          applyMode(msg.mode);
+          if (!['off', 'on'].includes(msg.mode)) { sendResponse({ ok: false }); break; }
+          setMode(msg.mode);
           sendResponse({ mode: state.mode });
           break;
         case 'toggle':
@@ -648,6 +669,14 @@
           break;
         case 'setFixateIntensity':
           setFixateIntensity(msg.value);
+          sendResponse({ ok: true });
+          break;
+        case 'setRestyleEnabled':
+          setRestyleEnabled(msg.value);
+          sendResponse({ ok: true });
+          break;
+        case 'setReaderEnabled':
+          setReaderEnabled(msg.value);
           sendResponse({ ok: true });
           break;
         case 'setTheme':
@@ -682,8 +711,6 @@
   /* ------------------------------- init ------------------------------- */
 
   loadSettings().then(() => {
-    // When the global mode is non-off, apply on every site unless this
-    // hostname is explicitly opted out via 'Never'.
-    reevaluate();
+    applyEnabled();
   });
 })();

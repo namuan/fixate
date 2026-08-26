@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Fixate",
   "short_name": "Fixate",
-  "version": "2.0.0",
-  "description": "Bold the first part of every word — with an optional warm, distraction-free reader view for long articles. Fixate, Restyle, and Reader modes.",
+  "version": "2.1.0",
+  "description": "Bold the first part of every word — with optional in-place repaint (Restyle) and distraction-free reader view (Reader) that layer on top of Fixate.",
   "permissions": ["storage"],
   "host_permissions": ["<all_urls>"],
   "action": {
