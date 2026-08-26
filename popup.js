@@ -20,6 +20,10 @@
     popup: document.querySelector('.popup'),
     modeSeg: document.getElementById('mode-seg'),
     modeHint: document.getElementById('mode-hint'),
+    pauseToggle: document.getElementById('pause-toggle'),
+    pauseStatus: document.getElementById('pause-status'),
+    pauseHint: document.getElementById('pause-hint'),
+    pauseSection: document.getElementById('pause-section'),
     fixateEnabled: document.getElementById('fixate-enabled'),
     fixateStatus: document.getElementById('fixate-status'),
     intensity: document.getElementById('intensity'),
@@ -142,10 +146,20 @@
     }
     el.popup.classList.remove('unavailable');
 
+    const suspended = !!st.suspended;
+    el.popup.classList.toggle('suspended', suspended);
+    if (el.pauseToggle) el.pauseToggle.checked = suspended;
+    if (el.pauseStatus) el.pauseStatus.textContent = suspended ? 'Paused' : 'Active';
+    if (el.pauseHint) el.pauseHint.textContent = suspended
+      ? 'Fixate is paused on this tab only. Toggle off to resume — global mode unchanged.'
+      : 'Temporarily disable on this tab only. Does not change global mode or site settings.';
+
     const mode = st.mode === 'on' ? 'on' : 'off';
     el.popup.classList.toggle('mode-off', mode === 'off');
     setActive(el.modeSeg, 'mode', mode);
-    el.modeHint.textContent = MODE_HINTS[mode] || MODE_HINTS.off;
+    el.modeHint.textContent = suspended
+      ? 'Paused on this tab — Fixate is temporarily hidden here but global mode stays On.'
+      : (MODE_HINTS[mode] || MODE_HINTS.off);
 
     el.fixateEnabled.checked = !!st.fixateEnabled;
     el.fixateStatus.textContent = st.fixateEnabled ? 'On' : 'Off';
@@ -176,6 +190,14 @@
   }
 
   /* ----- interactions ----- */
+
+  if (el.pauseToggle) {
+    el.pauseToggle.addEventListener('change', async () => {
+      const value = el.pauseToggle.checked;
+      await send({ type: 'setSuspended', value });
+      if (st) { st.suspended = value; render(); }
+    });
+  }
 
   el.modeSeg.addEventListener('click', async (e) => {
     const btn = e.target.closest('.seg-btn');

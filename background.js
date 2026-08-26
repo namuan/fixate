@@ -42,13 +42,14 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.commands.onCommand.addListener((command) => {
-  if (command !== 'toggle-fixate') return;
+  if (command !== 'toggle-fixate' && command !== 'toggle-suspend') return;
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || tabs.length === 0) return;
     const tab = tabs[0];
     if (!tab || !tab.id) return;
     if (tab.url && !/^(https?|file):/.test(tab.url)) return;
-    chrome.tabs.sendMessage(tab.id, { type: 'toggle' }, () => {
+    const msgType = command === 'toggle-suspend' ? 'toggleSuspended' : 'toggle';
+    chrome.tabs.sendMessage(tab.id, { type: msgType }, () => {
       void chrome.runtime.lastError;
     });
   });

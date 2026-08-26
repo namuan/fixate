@@ -400,6 +400,21 @@ kbd {
   opacity: 0.55;
 }
 
+.popup.suspended #fixate-section,
+.popup.suspended #style-section,
+.popup.suspended #reading-section {
+  opacity: 0.45;
+}
+
+.popup.suspended #pause-section {
+  border-color: var(--rust);
+  box-shadow: 0 0 0 2px rgba(137, 85, 62, 0.12);
+}
+
+#pause-section .row-desc {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Disabled state when on an un-injectable page */
 .popup.unavailable .section,
 .popup.unavailable .foot {

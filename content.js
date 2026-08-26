@@ -56,6 +56,7 @@
     fontScale: 1,
     keepFiguresLight: false,
     siteOverride: 'default',
+    suspended: false,
     reader: { host: null, shadow: null, body: null, scrollY: 0 },
     restyle: { barEls: [] }
   };
@@ -114,13 +115,17 @@
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
+  function isSuspended() {
+    return !!state.suspended;
+  }
+
   function isRestyleActive() {
-    return state.mode === 'on' && state.restyleEnabled && !state.readerEnabled &&
+    return !isSuspended() && state.mode === 'on' && state.restyleEnabled && !state.readerEnabled &&
       state.siteOverride !== 'never';
   }
 
   function isReaderActive() {
-    return state.mode === 'on' && state.readerEnabled && state.siteOverride !== 'never';
+    return !isSuspended() && state.mode === 'on' && state.readerEnabled && state.siteOverride !== 'never';
   }
 
   /* ------------------------- document-level fonts --------------------- */
@@ -161,6 +166,7 @@
   /* ------------------------- fixate root selection -------------------- */
 
   function fixateRoot() {
+    if (isSuspended()) return null;
     if (state.reader.body) return state.reader.body;
     if (state.mode === 'on' && state.siteOverride !== 'never') return document.body;
     return null;
@@ -488,7 +494,7 @@
     removeRestyle();
     removeFixate();
 
-    if (state.mode !== 'on' || state.siteOverride === 'never') {
+    if (isSuspended() || state.mode !== 'on' || state.siteOverride === 'never') {
       notifyBackground();
       return;
     }
@@ -538,7 +544,7 @@
   }
 
   function notifyBackground() {
-    const effective = (state.mode === 'on' && state.siteOverride !== 'never') ? 'on' : 'off';
+    const effective = (!isSuspended() && state.mode === 'on' && state.siteOverride !== 'never') ? 'on' : 'off';
     try { chrome.runtime.sendMessage({ type: 'stateChanged', mode: effective }); } catch (e) {}
   }
 
@@ -621,13 +627,20 @@
     const o = { ...((state && state._siteOverrides) || {}) };
     if (value === 'default') delete o[host()];
     else if (value === 'never') o[host()] = 'never';
-    // 'always' is accepted for backward compatibility but treated as default —
-    // the extension runs on every site when mode is non-off, so there's nothing
-    // distinct to opt back into.
     state._siteOverrides = o;
     state.siteOverride = o[host()] === 'never' ? 'never' : 'default';
     saveSettings({ siteOverrides: o });
     applyEnabled();
+  }
+
+  function setSuspended(value) {
+    state.suspended = !!value;
+    applyEnabled();
+  }
+
+  function toggleSuspended() {
+    setSuspended(!state.suspended);
+    return state.suspended;
   }
 
   /* ----------------------------- messaging ---------------------------- */
@@ -642,7 +655,8 @@
             mode: state.mode,
             host: host(),
             origin: location.origin,
-            effectiveMode: state.siteOverride === 'never' ? 'off' : state.mode,
+            effectiveMode: isSuspended() || state.siteOverride === 'never' ? 'off' : state.mode,
+            suspended: !!state.suspended,
             neverThisSite: state.siteOverride === 'never',
             siteOverrides: state._siteOverrides || {},
             fixateEnabled: state.fixateEnabled,
@@ -697,8 +711,27 @@
           setSiteOverride(msg.value);
           sendResponse({ ok: true });
           break;
+        case 'setSuspended':
+          setSuspended(!!msg.value);
+          sendResponse({ ok: true, suspended: !!state.suspended });
+          break;
+        case 'toggleSuspended':
+        case 'suspendToggle':
+        case 'toggleSuspend':
+          toggleSuspended();
+          sendResponse({ ok: true, suspended: !!state.suspended });
+          break;
+        case 'suspend':
+          setSuspended(true);
+          sendResponse({ ok: true, suspended: true });
+          break;
+        case 'resume':
+        case 'unsuspend':
+          setSuspended(false);
+          sendResponse({ ok: true, suspended: false });
+          break;
         case 'reapply':
-          refreshFixate();
+          if (!isSuspended()) refreshFixate();
           sendResponse({ ok: true });
           break;
         default:
