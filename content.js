@@ -62,6 +62,8 @@
   };
 
   const host = () => location.hostname;
+  const siteKey = (h) =>
+    (typeof tldts !== 'undefined' && tldts.getDomain(h, { allowPrivateDomains: true })) || h;
 
   /* ----------------------------- settings ----------------------------- */
 
@@ -91,7 +93,8 @@
         state.fontScale = Number.isFinite(fs) ? Math.min(1.6, Math.max(0.8, fs)) : 1;
         state.keepFiguresLight = !!s.keepFiguresLight;
         state._siteOverrides = s.siteOverrides || {};
-        state.siteOverride = state._siteOverrides[host()] === 'never' ? 'never' : 'default';
+        state.siteOverride = state._siteOverrides[siteKey(host())] === 'never' ||
+          state._siteOverrides[host()] === 'never' ? 'never' : 'default';
 
         // Persist the migrated shape so subsequent reads (popup, background)
         // always see the canonical keys and values.
@@ -625,10 +628,11 @@
 
   function setSiteOverride(value) {
     const o = { ...((state && state._siteOverrides) || {}) };
-    if (value === 'default') delete o[host()];
-    else if (value === 'never') o[host()] = 'never';
+    const key = siteKey(host());
+    if (value === 'default') delete o[key];
+    else if (value === 'never') o[key] = 'never';
     state._siteOverrides = o;
-    state.siteOverride = o[host()] === 'never' ? 'never' : 'default';
+    state.siteOverride = o[key] === 'never' ? 'never' : 'default';
     saveSettings({ siteOverrides: o });
     applyEnabled();
   }

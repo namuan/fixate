@@ -58,9 +58,9 @@
   };
 
   function siteHintText(state) {
-    if (state.neverThisSite) return 'Disabled on this site. Toggle off to re-enable.';
+    if (state.neverThisSite) return 'Disabled on this site and all its subdomains. Toggle off to re-enable.';
     if (state.mode === 'off') return 'Extension is OFF. Switch to On above to apply here.';
-    return 'When the extension is ON, it applies on every site. Toggle on to exclude this one.';
+    return 'When the extension is ON, it applies on every site. Toggle on to exclude this site and its subdomains.';
   }
 
   function styleHintText(state) {

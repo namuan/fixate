@@ -25,7 +25,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["fixate.js", "readability.js", "content.js"],
+      "js": ["fixate.js", "readability.js", "tldts.min.js", "content.js"],
       "css": ["fixate.css"],
       "run_at": "document_idle",
       "all_frames": false
