@@ -647,6 +647,25 @@
     return state.suspended;
   }
 
+  function currentState() {
+    return {
+      mode: state.mode,
+      host: host(),
+      origin: location.origin,
+      effectiveMode: isSuspended() || state.siteOverride === 'never' ? 'off' : state.mode,
+      suspended: !!state.suspended,
+      neverThisSite: state.siteOverride === 'never',
+      siteOverrides: state._siteOverrides || {},
+      fixateEnabled: state.fixateEnabled,
+      fixateIntensity: Math.round(state.intensity * 100),
+      restyleEnabled: state.restyleEnabled,
+      readerEnabled: state.readerEnabled,
+      theme: state.theme,
+      fontScale: state.fontScale,
+      keepFiguresLight: state.keepFiguresLight
+    };
+  }
+
   /* ----------------------------- messaging ---------------------------- */
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -655,21 +674,12 @@
       if (!msg || typeof msg !== 'object') { sendResponse({ ok: false }); return; }
       switch (msg.type) {
         case 'getState':
-          sendResponse({
-            mode: state.mode,
-            host: host(),
-            origin: location.origin,
-            effectiveMode: isSuspended() || state.siteOverride === 'never' ? 'off' : state.mode,
-            suspended: !!state.suspended,
-            neverThisSite: state.siteOverride === 'never',
-            siteOverrides: state._siteOverrides || {},
-            fixateEnabled: state.fixateEnabled,
-            fixateIntensity: Math.round(state.intensity * 100),
-            restyleEnabled: state.restyleEnabled,
-            readerEnabled: state.readerEnabled,
-            theme: state.theme,
-            fontScale: state.fontScale,
-            keepFiguresLight: state.keepFiguresLight
+          sendResponse(currentState());
+          break;
+        case 'reloadSettings':
+          loadSettings().then(() => {
+            applyEnabled();
+            sendResponse(currentState());
           });
           break;
         case 'setMode':

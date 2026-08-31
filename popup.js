@@ -40,7 +40,9 @@
     keepFiguresLight: document.getElementById('keep-figures-light'),
     neverThisSite: document.getElementById('never-this-site'),
     siteHost: document.getElementById('site-host'),
-    siteHint: document.getElementById('site-hint')
+    siteHint: document.getElementById('site-hint'),
+    resetBtn: document.getElementById('reset-btn'),
+    resetStatus: document.getElementById('reset-status')
   };
 
   const PREVIEW_TEXT = el.preview.textContent.trim();
@@ -95,6 +97,8 @@
   let tabId = null;
   let st = null;
   let saveTimer = null;
+  let confirmTimer = null;
+  let statusTimer = null;
 
   function send(msg) {
     return new Promise((resolve) => {
@@ -268,6 +272,40 @@
       st.siteOverride = value;
       render();
     }
+  });
+
+  /* ----- reset all settings ----- */
+
+  function setResetStatus(text) {
+    el.resetStatus.textContent = text;
+    clearTimeout(statusTimer);
+    if (text) statusTimer = setTimeout(() => { el.resetStatus.textContent = ''; }, 3000);
+  }
+
+  function cancelResetConfirm() {
+    clearTimeout(confirmTimer);
+    el.resetBtn.classList.remove('confirming');
+    el.resetBtn.textContent = 'Reset all settings';
+  }
+
+  el.resetBtn.addEventListener('click', async () => {
+    if (!el.resetBtn.classList.contains('confirming')) {
+      el.resetBtn.classList.add('confirming');
+      el.resetBtn.textContent = 'Confirm reset?';
+      setResetStatus('Clears every saved setting and restores defaults.');
+      confirmTimer = setTimeout(cancelResetConfirm, 4000);
+      return;
+    }
+    cancelResetConfirm();
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    const prevSt = st;
+    st = null;
+    await new Promise((r) => chrome.storage.sync.clear(r));
+    const resp = await send({ type: 'reloadSettings' });
+    st = normaliseState(resp) || prevSt;
+    render();
+    setResetStatus(resp ? 'Reset to defaults.' : 'Settings cleared — reload this page to apply.');
   });
 
   /* ----- init ----- */

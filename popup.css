@@ -391,6 +391,45 @@ kbd {
   margin: 0 1px;
 }
 
+/* ----- reset ----- */
+.resetbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.reset-status {
+  font-size: 11px;
+  color: var(--body);
+  line-height: 1.3;
+  min-height: 15px;
+  text-align: center;
+}
+
+.reset-btn {
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--body);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.reset-btn:hover { border-color: var(--rust); color: var(--rust); }
+.reset-btn:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+.reset-btn.confirming {
+  background: var(--kbd-bg);
+  border-color: var(--rust);
+  color: var(--rust);
+}
+
 /* Mode-off: every section below the Mode picker is dimmed but still
    inspectable so the user can pre-configure toggles for when they switch on. */
 .popup.mode-off #fixate-section,
