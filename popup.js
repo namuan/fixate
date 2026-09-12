@@ -166,7 +166,9 @@
       : (MODE_HINTS[mode] || MODE_HINTS.off);
 
     el.fixateEnabled.checked = !!st.fixateEnabled;
-    el.fixateStatus.textContent = st.fixateEnabled ? 'On' : 'Off';
+    el.fixateStatus.textContent = !st.fixateEnabled
+      ? 'Off'
+      : (st.fixateHealth === 'failed' ? 'Paused — page issue' : 'On');
     el.intensity.value = String(st.fixateIntensity);
     el.intensityValue.textContent = st.fixateIntensity + '%';
     el.intensity.disabled = !st.fixateEnabled;

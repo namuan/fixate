@@ -57,9 +57,15 @@
     keepFiguresLight: false,
     siteOverride: 'default',
     suspended: false,
+    fixateBlocked: false,
+    fixateHealth: 'ok',
     reader: { host: null, shadow: null, body: null, scrollY: 0 },
     restyle: { barEls: [] }
   };
+
+  const FIXATE_HEALTH_DELAY = 900;
+  let fixateWatchdogTimer = null;
+  let fixateWatchdogRoot = null;
 
   const host = () => location.hostname;
   const siteKey = (h) =>
@@ -169,35 +175,128 @@
   /* ------------------------- fixate root selection -------------------- */
 
   function fixateRoot() {
-    if (isSuspended()) return null;
+    if (isSuspended() || state.fixateBlocked || !state.fixateEnabled) return null;
     if (state.reader.body) return state.reader.body;
     if (state.mode === 'on' && state.siteOverride !== 'never') return document.body;
     return null;
   }
 
+  function cancelFixateWatchdog() {
+    if (fixateWatchdogTimer) clearTimeout(fixateWatchdogTimer);
+    fixateWatchdogTimer = null;
+    fixateWatchdogRoot = null;
+  }
+
+  function rootHealthSnapshot(root) {
+    const rect = root.getBoundingClientRect();
+    const scrollRoot = root === document.body ? document.documentElement : root;
+    const text = String(root.innerText || root.textContent || '').replace(/\s+/g, ' ').trim();
+    const anchors = [];
+    const candidates = root.querySelectorAll('main, article, [role="main"], h1, h2, h3');
+    for (const el of candidates) {
+      if (anchors.length >= 16) break;
+      const box = el.getBoundingClientRect();
+      if (box.width < 20 || box.height < 10 || box.bottom < 0 || box.right < 0) continue;
+      anchors.push({ el, width: box.width, height: box.height });
+    }
+    return {
+      textLength: text.length,
+      rect,
+      scrollHeight: Math.max(scrollRoot.scrollHeight || 0, root.scrollHeight || 0),
+      scrollWidth: Math.max(scrollRoot.scrollWidth || 0, root.scrollWidth || 0),
+      anchors
+    };
+  }
+
+  function hasFixateLayoutFailure(root, before) {
+    if (!root || !root.isConnected) return true;
+    const after = rootHealthSnapshot(root);
+    if (before.textLength >= 200 && after.textLength < before.textLength * 0.65) return true;
+    if (before.rect.width >= 100 && after.rect.width < before.rect.width * 0.5) return true;
+    if (before.rect.height >= 100 && after.rect.height < before.rect.height * 0.4) return true;
+    if (before.scrollHeight >= 300 && after.scrollHeight < before.scrollHeight * 0.4) return true;
+    if (before.scrollWidth >= 300 && after.scrollWidth > Math.max(before.scrollWidth * 2, before.scrollWidth + 1200)) return true;
+
+    const wrappers = root.querySelectorAll('.fixate-wrapper');
+    const sampleSize = Math.min(wrappers.length, 64);
+    let incompatibleWrappers = 0;
+    for (let i = 0; i < sampleSize; i++) {
+      const style = getComputedStyle(wrappers[i]);
+      if (style.display !== 'contents' || style.visibility === 'hidden') incompatibleWrappers++;
+    }
+    if (sampleSize >= 8 && incompatibleWrappers >= Math.max(2, Math.ceil(sampleSize * 0.25))) return true;
+
+    if (before.anchors.length >= 2) {
+      let collapsed = 0;
+      for (const anchor of before.anchors) {
+        if (!anchor.el.isConnected) {
+          collapsed++;
+          continue;
+        }
+        const box = anchor.el.getBoundingClientRect();
+        if (box.width < anchor.width * 0.35 || box.height < anchor.height * 0.35) collapsed++;
+      }
+      if (collapsed >= Math.max(2, Math.ceil(before.anchors.length * 0.5))) return true;
+    }
+    return false;
+  }
+
+  function markFixateFailed(root, reason) {
+    cancelFixateWatchdog();
+    try { if (window.Fixate) window.Fixate.unapply(root); } catch (e) {}
+    state.fixateBlocked = true;
+    state.fixateHealth = 'failed';
+    try { console.warn('Fixate disabled for this page:', reason); } catch (e) {}
+    notifyBackground();
+  }
+
+  function scheduleFixateWatchdog(root, before) {
+    cancelFixateWatchdog();
+    fixateWatchdogRoot = root;
+    fixateWatchdogTimer = setTimeout(() => {
+      fixateWatchdogTimer = null;
+      if (fixateWatchdogRoot !== root) return;
+      fixateWatchdogRoot = null;
+      if (hasFixateLayoutFailure(root, before)) markFixateFailed(root, 'page layout changed unexpectedly');
+    }, FIXATE_HEALTH_DELAY);
+  }
+
   function applyFixate() {
     const root = fixateRoot();
-    if (!root) return;
-    if (window.Fixate && !window.Fixate.isApplied(root)) {
-      window.Fixate.apply(root, state.intensity);
+    if (!root || !window.Fixate) return;
+    if (!window.Fixate.isApplied(root)) {
+      try {
+        const before = rootHealthSnapshot(root);
+        window.Fixate.apply(root, state.intensity);
+        scheduleFixateWatchdog(root, before);
+      } catch (e) {
+        markFixateFailed(root, 'applying the text transform failed');
+      }
     }
   }
 
   function refreshFixate() {
-    const root = fixateRoot();
-    if (!root) return;
-    if (state.fixateEnabled) {
-      if (window.Fixate && window.Fixate.isApplied(root)) {
-        window.Fixate.update(root, state.intensity);
-      } else {
-        window.Fixate.apply(root, state.intensity);
-      }
-    } else {
+    cancelFixateWatchdog();
+    const root = isSuspended() ? null : (state.reader.body ||
+      (state.mode === 'on' && state.siteOverride !== 'never' ? document.body : null));
+    if (!root || !window.Fixate) return;
+    if (!state.fixateEnabled || state.fixateBlocked) {
       window.Fixate.unapply(root);
+      return;
+    }
+
+    try {
+      const before = rootHealthSnapshot(root);
+      if (window.Fixate.isApplied(root)) window.Fixate.update(root, state.intensity);
+      else window.Fixate.apply(root, state.intensity);
+      scheduleFixateWatchdog(root, before);
+    } catch (e) {
+      markFixateFailed(root, 'updating the text transform failed');
     }
   }
 
   function removeFixate() {
+    cancelFixateWatchdog();
     if (!window.Fixate) return;
     if (state.reader.body) window.Fixate.unapply(state.reader.body);
     window.Fixate.unapply(document.body);
@@ -557,6 +656,10 @@
     if (mode !== 'off' && mode !== 'on') return;
     if (state.mode === mode) return;
     state.mode = mode;
+    if (mode === 'on') {
+      state.fixateBlocked = false;
+      state.fixateHealth = 'ok';
+    }
     saveSettings({ mode });
     applyEnabled();
   }
@@ -602,6 +705,10 @@
 
   function setFixateEnabled(value) {
     state.fixateEnabled = !!value;
+    if (state.fixateEnabled) {
+      state.fixateBlocked = false;
+      state.fixateHealth = 'ok';
+    }
     saveSettings({ fixateEnabled: state.fixateEnabled });
     refreshFixate();
   }
@@ -662,7 +769,8 @@
       readerEnabled: state.readerEnabled,
       theme: state.theme,
       fontScale: state.fontScale,
-      keepFiguresLight: state.keepFiguresLight
+      keepFiguresLight: state.keepFiguresLight,
+      fixateHealth: state.fixateHealth
     };
   }
 
